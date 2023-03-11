@@ -197,6 +197,8 @@ def taiji_main(args):
         os.makedirs(os.path.join(args.save_dir, 'Taiji', args.fp_size))
 
     if args.device == 'cuda':
+        if not torch.cuda.is_available():
+            print("GPU is not available, use CPU instead.")
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     else:
         device = torch.device('cpu')

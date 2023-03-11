@@ -28,7 +28,15 @@ class MLP(nn.Module):
         """
         super(MLP, self).__init__()
         if improved:
-            pass
+            self.layers = nn.Sequential(
+                nn.Linear(input_dim, hidden_dim),
+                nn.ReLU(),
+                nn.Linear(hidden_dim, hidden_dim),
+                nn.ReLU(),
+                nn.Linear(hidden_dim, hidden_dim),
+                nn.Relu(),
+                nn.Linear(hidden_dim, output_dim),
+            )
         else:
             self.layers = nn.Sequential(
                 nn.Linear(input_dim, hidden_dim),
