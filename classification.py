@@ -213,7 +213,7 @@ def taiji_main(args):
         test_data = TaijiData(data_dir ='data', subject=i+1, split='test', fp_size=args.fp_size)
         train_loader = DataLoader(train_data, batch_size=args.batch_size, shuffle=True)
         test_loader = DataLoader(test_data, batch_size=args.batch_size, shuffle=False)
-        model = MLP(input_dim=train_data.data_dim, hidden_dim=1024, output_dim=num_forms).to(device)
+        model = MLP(input_dim=train_data.data_dim, hidden_dim=1024, output_dim=num_forms, improved=args.improved).to(device)
         optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
         criterion = nn.CrossEntropyLoss()
 
@@ -232,7 +232,7 @@ def taiji_main(args):
         if not os.path.exists(os.path.join(args.save_dir, 'Taiji', args.fp_size, 'stats')):
             os.makedirs(os.path.join(args.save_dir, 'Taiji', args.fp_size, 'stats'))
 
-        sub_file = os.path.join(args.save_dir, 'Taiji',args.fp_size, 'stats', 'sub_{}.npz'.format(i+1))
+        sub_file = os.path.join(args.save_dir, 'Taiji', args.fp_size, 'stats', 'sub_{}.npz'.format(i+1))
         classes_train, conf_mat_train = get_stats(train_preds, train_targets, num_forms)
         classes_test, conf_mat_test = get_stats(test_pred, test_targets, num_forms)
         sub_class_train[i, :] = classes_train
@@ -243,6 +243,9 @@ def taiji_main(args):
                  conf_mat_train=conf_mat_train, conf_mat_test=conf_mat_test)
 
         # Note: the code does not save the model, but you may choose to do so with the arg.save_model flag
+        if args.save_model:
+            model_save_file = os.path.join(args.save_dir, 'Taiji', args.fp_size, 'model', 'state_dict_{}.pt'.format(i+1))
+            torch.save(model.state_dict(), model_save_file)
         
     # Save overall stats
     overall_train_acc = np.mean(sub_train_acc)

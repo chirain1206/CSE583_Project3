@@ -19,7 +19,7 @@ import torch.nn.functional as F
 
 # TODO: Can the MLP be improved?
 class MLP(nn.Module):
-    def __init__(self, input_dim, hidden_dim, output_dim):
+    def __init__(self, input_dim, hidden_dim, output_dim, improved=False):
         """
         Args:
             input_dim (int): number of input features
@@ -27,11 +27,14 @@ class MLP(nn.Module):
             output_dim (int): number of output units
         """
         super(MLP, self).__init__()
-        self.layers = nn.Sequential(
-            nn.Linear(input_dim, hidden_dim),
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.Linear(hidden_dim, output_dim),
-        )
+        if improved:
+            pass
+        else:
+            self.layers = nn.Sequential(
+                nn.Linear(input_dim, hidden_dim),
+                nn.Linear(hidden_dim, hidden_dim),
+                nn.Linear(hidden_dim, output_dim),
+            )
 
     def forward(self, x):
         return F.log_softmax(self.layers(x), dim=1)

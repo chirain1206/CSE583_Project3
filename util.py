@@ -54,6 +54,7 @@ def arg_parse():
     parser.add_argument('--img_size', type=int, default=128, help='Size of image to be resized to')
     parser.add_argument('--test_set', type=str, default='test', help='Test set to use (test or test_challenge)')
     parser.add_argument('--aug_train', action='store_true', help='Use augmented training data')
+    parser.add_argument('--improved', action='store_true', help='whether or not to use the improved version')
      
 
     return parser.parse_args()
