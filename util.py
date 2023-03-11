@@ -197,12 +197,13 @@ def visualize(args, dataset):
         label_names = os.listdir(os.path.join(args.data_root, 'Wallpaper', 'train'))
 
     # Save and load dirs
+    improved_dir = 'improved' if args.improved else 'baseline'
     if dataset == 'Taiji':
-        load_dir = os.path.join(args.save_dir, dataset, args.fp_size, 'stats')
-        save_dir = os.path.join(args.save_dir, dataset, args.fp_size, 'plots')
+        load_dir = os.path.join(args.save_dir, dataset, args.fp_size, improved_dir, 'stats')
+        save_dir = os.path.join(args.save_dir, dataset, args.fp_size, improved_dir, 'plots')
     else:
-        load_dir = os.path.join(args.save_dir, dataset, args.test_set, 'stats')
-        save_dir = os.path.join(args.save_dir, dataset, args.test_set, 'plots')
+        load_dir = os.path.join(args.save_dir, dataset, args.test_set, improved_dir, 'stats')
+        save_dir = os.path.join(args.save_dir, dataset, args.test_set, improved_dir, 'plots')
 
     overall_file = os.path.join(load_dir, 'overall.npz')
     overall_results = np.load(overall_file)

@@ -234,7 +234,8 @@ def taiji_main(args):
         if not os.path.exists(os.path.join(args.save_dir, 'Taiji', args.fp_size, 'stats')):
             os.makedirs(os.path.join(args.save_dir, 'Taiji', args.fp_size, 'stats'))
 
-        sub_file = os.path.join(args.save_dir, 'Taiji', args.fp_size, 'stats', 'sub_{}.npz'.format(i+1))
+        improved_dir = 'improved' if args.improved else 'baseline'
+        sub_file = os.path.join(args.save_dir, 'Taiji', args.fp_size, improved_dir, 'stats', 'sub_{}.npz'.format(i+1))
         classes_train, conf_mat_train = get_stats(train_preds, train_targets, num_forms)
         classes_test, conf_mat_test = get_stats(test_pred, test_targets, num_forms)
         sub_class_train[i, :] = classes_train
@@ -246,7 +247,9 @@ def taiji_main(args):
 
         # Note: the code does not save the model, but you may choose to do so with the arg.save_model flag
         if args.save_model:
-            model_save_file = os.path.join(args.save_dir, 'Taiji', args.fp_size, 'model', 'state_dict_{}.pt'.format(i+1))
+            improved_dir = 'improved' if args.improved else 'baseline'
+            model_save_file = os.path.join(args.save_dir, 'Taiji', args.fp_size,
+                                           improved_dir, 'state_dict_{}.pt'.format(i+1))
             torch.save(model.state_dict(), model_save_file)
         
     # Save overall stats
