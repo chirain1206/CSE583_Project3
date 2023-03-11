@@ -143,11 +143,13 @@ def plot_training_curve(args):
     Args:
         args: Arguments
     """
+    improved_dir = 'improved' if args.improved else 'baseline'
+
     # Plot the training curve
     if args.dataset == 'Taiji':
         per_epoch_accs = []
         for i in range(1, args.num_subs+1):
-            data = np.load(os.path.join(args.save_dir, args.dataset, args.fp_size, 'stats', f'sub_{i}.npz'))
+            data = np.load(os.path.join(args.save_dir, args.dataset, args.fp_size, improved_dir, 'stats', f'sub_{i}.npz'))
             per_epoch_accs.append(data['per_epoch_acc'])
         per_epoch_accs = np.array(per_epoch_accs)
         # Plot each subject training acc curve
@@ -159,17 +161,17 @@ def plot_training_curve(args):
         plt.xlabel('Epoch')
         plt.ylabel('Accuracy')
         plt.title(f'Taiji Subject Training Accuracy ({args.fp_size} fp)')
-        plt.savefig(os.path.join(args.save_dir, args.dataset, args.fp_size, 'plots', 'taiji_training_curve.png'))
+        plt.savefig(os.path.join(args.save_dir, args.dataset, args.fp_size, improved_dir, 'plots', 'taiji_training_curve.png'))
         plt.close()
     else:
-        data = np.load(os.path.join(args.save_dir, args.dataset, args.test_set, 'stats', 'overall.npz'))
+        data = np.load(os.path.join(args.save_dir, args.dataset, args.test_set, improved_dir, 'stats', 'overall.npz'))
         per_epoch_accs = data['per_epoch_acc']
         fig = plt.figure()
         plt.plot(per_epoch_accs)
         plt.xlabel('Epoch')
         plt.ylabel('Accuracy')
         plt.title(f'Wallpaper Training Accuracy ({args.test_set})')
-        plt.savefig(os.path.join(args.save_dir, args.dataset, args.test_set, 'plots', 'wallpaper_training_curve.png'))
+        plt.savefig(os.path.join(args.save_dir, args.dataset, args.test_set, improved_dir, 'plots', 'wallpaper_training_curve.png'))
         plt.close()
 
         

@@ -192,6 +192,7 @@ def taiji_main(args):
     sub_class_test = np.zeros((num_subs, num_forms))
     overall_train_mat = np.zeros((num_forms, 1))
     overall_test_mat = np.zeros((num_forms, 1))
+    improved_dir = 'improved' if args.improved else 'baseline'
 
     if not os.path.exists(os.path.join(args.save_dir, 'Taiji', args.fp_size)):
         os.makedirs(os.path.join(args.save_dir, 'Taiji', args.fp_size))
@@ -231,10 +232,9 @@ def taiji_main(args):
         print(f'Subject {i+1} Test Accuracy: {test_acc*100:.3f}')
         
         # Save all stats (you can save the model if you choose to)
-        if not os.path.exists(os.path.join(args.save_dir, 'Taiji', args.fp_size, 'stats')):
-            os.makedirs(os.path.join(args.save_dir, 'Taiji', args.fp_size, 'stats'))
+        if not os.path.exists(os.path.join(args.save_dir, 'Taiji', args.fp_size, improved_dir, 'stats')):
+            os.makedirs(os.path.join(args.save_dir, 'Taiji', args.fp_size, improved_dir, 'stats'))
 
-        improved_dir = 'improved' if args.improved else 'baseline'
         sub_file = os.path.join(args.save_dir, 'Taiji', args.fp_size, improved_dir, 'stats', 'sub_{}.npz'.format(i+1))
         classes_train, conf_mat_train = get_stats(train_preds, train_targets, num_forms)
         classes_test, conf_mat_test = get_stats(test_pred, test_targets, num_forms)
@@ -247,9 +247,11 @@ def taiji_main(args):
 
         # Note: the code does not save the model, but you may choose to do so with the arg.save_model flag
         if args.save_model:
-            improved_dir = 'improved' if args.improved else 'baseline'
+            if not os.path.exists(os.path.join(args.save_dir, 'Taiji', args.fp_size, improved_dir, 'model')):
+                os.makedirs(os.path.join(args.save_dir, 'Taiji', args.fp_size, improved_dir, 'model'))
+
             model_save_file = os.path.join(args.save_dir, 'Taiji', args.fp_size,
-                                           improved_dir, 'state_dict_{}.pt'.format(i+1))
+                                           improved_dir, 'model', 'state_dict_{}.pt'.format(i+1))
             torch.save(model.state_dict(), model_save_file)
         
     # Save overall stats
@@ -258,7 +260,7 @@ def taiji_main(args):
     print(f"\n\nOverall Train Accuracy: {overall_train_acc:.3f}")
     print(f"Overall Test Accuracy: {overall_test_acc:.3f}")
 
-    overall_file_name = os.path.join(args.save_dir, 'Taiji', args.fp_size, 'stats', 'overall.npz')
+    overall_file_name = os.path.join(args.save_dir, 'Taiji', args.fp_size, improved_dir, 'stats', 'overall.npz')
     np.savez(overall_file_name, sub_train_acc = sub_train_acc, sub_class_train=sub_class_train,
              sub_test_acc=sub_test_acc, sub_class_test=sub_class_test, overall_train_mat=overall_train_mat, overall_test_mat=overall_test_mat)
 
