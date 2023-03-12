@@ -52,6 +52,7 @@ def arg_parse():
     parser.add_argument('--fp_size', type=str, default='lod4', help='Size of the fingerprint to use (lod4 or full)')
     # Wallpapers specific
     parser.add_argument('--img_size', type=int, default=128, help='Size of image to be resized to')
+    parser.add_argument('--comp_subject_numb', type=int, default=8, help='The subject number for comparing the confusion matrix')
     parser.add_argument('--test_set', type=str, default='test', help='Test set to use (test or test_challenge)')
     parser.add_argument('--aug_train', action='store_true', help='Use augmented training data')
     parser.add_argument('--improved', action='store_true', help='whether or not to use the improved version')
@@ -231,6 +232,33 @@ def visualize(args, dataset):
         plt.savefig(os.path.join(save_dir, 'subject_wise_acc.png'))
         plt.close()
 
+    # Overall train/test acc and std averaged on all LOSO iterations
+    if dataset == 'Taiji':
+        overall_train_acc = overall_results['overall_train_acc']
+        overall_train_acc_std = overall_results['overall_train_acc_std']
+        overall_test_acc = overall_results['overall_test_acc']
+        overall_test_acc_std = overall_results['overall_test_acc_std']
+        fig, ax = plt.subplots()
+        ax2 = ax.twinx()
+        # ax.bar([0], [overall_train_acc], width=0.35, label='Accuracy', color='blue')
+        # ax.bar([0.35], [overall_test_acc], width=0.35, label='Accuracy', color='orange')
+        # ax2.bar([1], [overall_train_acc_std], width=0.35, label='Standard Deviation', color='blue')
+        # ax2.bar([1.35], [overall_test_acc_std], width=0.35, label='Standard Deviation', color='orange')
+        legend1 = ax.bar([0], [overall_train_acc], width=0.4, label='Accuracy', color='blue')
+        legend2 = ax2.bar([0.4], [overall_train_acc_std], width=0.4, label='Standard Deviation', color='orange')
+        ax.bar([1], [overall_test_acc], width=0.4, label='Accuracy', color='blue')
+        ax2.bar([1.4], [overall_test_acc_std], width=0.4, label='Standard Deviation', color='orange')
+        ax.set_ylabel('Accuracy')
+        ax2.set_ylabel('Standard Deviation')
+        ax.set_xlabel('Training or Testing')
+        ax.set_title('Training/Testing overall accuracy & std, averaged on all iterations')
+        # Make the x-axis labels start from 1
+        ax.set_xticks([0.2, 1.2])
+        ax.set_xticklabels(['Training', 'Testing'])
+        ax.legend(handles=[legend1, legend2], loc='upper center')
+        fig.tight_layout()
+        plt.savefig(os.path.join(save_dir, 'averaged overall acc and std.png'))
+        plt.close()
 
     # Overall per class training data. Tilt the x-axis labels by 45 degrees
     overall_train_mat = overall_results['overall_train_mat']
@@ -259,6 +287,19 @@ def visualize(args, dataset):
     fig.tight_layout()
     plt.savefig(os.path.join(save_dir, 'overall_per_class_test.png'))
 
+    # Overall per class testing data std
+    sub_class_test = overall_results['sub_class_test']
+    std_per_class_test = np.std(sub_class_test, axis=0)
+    fig, ax = plt.subplots(figsize=(10, 5))
+    ax.bar(np.arange(num_classes), std_per_class_test)
+    ax.set_ylabel('Accuracy Standard Deviation')
+    ax.set_xlabel('Class')
+    ax.set_title(f'{dataset} Overall per class testing accuracy standard deviation')
+    ax.set_xticks(np.arange(num_classes))
+    ax.set_xticklabels(label_names, rotation='vertical')
+    fig.tight_layout()
+    plt.savefig(os.path.join(save_dir, 'std_per_class_test.png'))
+
     # Overall training confusion matrix with sklearns display
     fig, ax = plt.subplots(figsize=(10, 10))
     overall_train_mat = overall_results['overall_train_mat']
@@ -278,5 +319,17 @@ def visualize(args, dataset):
     ax.set_title(f'{dataset} Overall Testing Confusion Matrix')
     fig.tight_layout()
     plt.savefig(os.path.join(save_dir, 'overall_test_conf_mat.png'))
+
+    # Testing confusion matrix of specific subject with sklearns display
+    fig, ax = plt.subplots(figsize=(10, 10))
+    comp_test_conf_mat = overall_results['comp_test_conf_mat']
+    comp_subj_numb = overall_results['comp_subj_numb']
+    disp = ConfusionMatrixDisplay(comp_test_conf_mat, display_labels=label_names)
+    disp.plot(include_values=False, xticks_rotation='vertical', ax=ax, cmap=plt.cm.plasma)
+    disp.ax_.get_images()[0].set_clim(0, 1)
+    ax.set_title(f'{dataset} Testing Confusion Matrix of Subject {comp_subj_numb}')
+    fig.tight_layout()
+    plt.savefig(os.path.join(save_dir, 'comp_test_conf_mat.png'))
+
     return
 

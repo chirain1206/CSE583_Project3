@@ -23,6 +23,7 @@ from tqdm import tqdm
 from util import *
 from models import *
 
+
 def test(model, test_loader, device, criterion):
     """
     Test the model.
@@ -57,8 +58,9 @@ def test(model, test_loader, device, criterion):
     targets = np.concatenate(targets)
     return test_loss, test_acc, preds, targets
 
+
 #  Note log_interval doesn't actually log to a file but is used for printing. This can be changed if you want to log to a file.
-def train(model, train_loader, optimizer, criterion, epochs, 
+def train(model, train_loader, optimizer, criterion, epochs,
           log_interval, device):
     """
     Train the model and periodically log the loss and accuracy.
@@ -107,7 +109,8 @@ def train(model, train_loader, optimizer, criterion, epochs,
 
     preds = np.concatenate(preds)
     targets = np.concatenate(targets)
-    return model, np.array(per_epoch_loss), np.array(per_epoch_acc), preds, targets   
+    return model, np.array(per_epoch_loss), np.array(per_epoch_acc), preds, targets
+
 
 def wallpaper_main(args):
     """
@@ -134,19 +137,17 @@ def wallpaper_main(args):
     if args.aug_train:
         raise NotImplementedError
 
-
     # Compose the transforms that will be applied to the images. Feel free to adjust this.
     transform = transforms.Compose([
         transforms.Resize((args.img_size, args.img_size)),
         transforms.Grayscale(),
         transforms.ToTensor(),
-        transforms.Normalize((0.5, ), (0.5, )),
+        transforms.Normalize((0.5,), (0.5,)),
     ])
     train_dataset = ImageFolder(os.path.join(data_root, 'train'), transform=transform)
     test_dataset = ImageFolder(os.path.join(data_root, args.test_set), transform=transform)
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
     test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False)
-
 
     print(f"Training on {len(train_dataset)} images, testing on {len(test_dataset)} images.")
     # Initialize the model, optimizer, and loss function
@@ -155,28 +156,29 @@ def wallpaper_main(args):
     criterion = nn.CrossEntropyLoss()
 
     # Train + test the model
-    model, per_epoch_loss, per_epoch_acc, train_preds, train_targets = train(model, train_loader, optimizer, criterion, args.num_epochs, 
-                                                                             args.log_interval, device )
+    model, per_epoch_loss, per_epoch_acc, train_preds, train_targets = train(model, train_loader, optimizer, criterion,
+                                                                             args.num_epochs,
+                                                                             args.log_interval, device)
     test_loss, test_acc, test_preds, test_targets = test(model, test_loader, device, criterion)
 
     # Get stats 
     classes_train, overall_train_mat = get_stats(train_preds, train_targets, num_classes)
     classes_test, overall_test_mat = get_stats(test_preds, test_targets, num_classes)
 
-
-    print(f'\n\nTrain accuracy: {per_epoch_acc[-1]*100:.3f}')
-    print(f'Test accuracy: {test_acc*100:.3f}')
+    print(f'\n\nTrain accuracy: {per_epoch_acc[-1] * 100:.3f}')
+    print(f'Test accuracy: {test_acc * 100:.3f}')
 
     if not os.path.exists(os.path.join(args.save_dir, 'Wallpaper', args.test_set, 'stats')):
         os.makedirs(os.path.join(args.save_dir, 'Wallpaper', args.test_set, 'stats'))
     overall_file_name = os.path.join(args.save_dir, 'Wallpaper', args.test_set, 'stats', 'overall.npz')
 
-    np.savez(overall_file_name, classes_train=classes_train, overall_train_mat=overall_train_mat, 
-                classes_test=classes_test, overall_test_mat=overall_test_mat, 
-                per_epoch_loss=per_epoch_loss, per_epoch_acc=per_epoch_acc, 
-                test_loss=test_loss, test_acc=test_acc)
+    np.savez(overall_file_name, classes_train=classes_train, overall_train_mat=overall_train_mat,
+             classes_test=classes_test, overall_test_mat=overall_test_mat,
+             per_epoch_loss=per_epoch_loss, per_epoch_acc=per_epoch_acc,
+             test_loss=test_loss, test_acc=test_acc)
 
     # Note: The code does not save the model but you may do so if you choose with the args.save_model flag.
+
 
 def taiji_main(args):
     """
@@ -185,13 +187,14 @@ def taiji_main(args):
         args (argparse.Namespace): Arguments.
     """
     num_subs = args.num_subs
-    num_forms = 46 # Number of taiji forms, hardcoded :p
+    num_forms = 46  # Number of taiji forms, hardcoded :p
     sub_train_acc = np.zeros(num_subs)
     sub_class_train = np.zeros((num_subs, num_forms))
     sub_test_acc = np.zeros(num_subs)
-    sub_class_test = np.zeros((num_subs, num_forms))
+    sub_class_test = np.zeros((num_subs, num_forms))  # test acc of each class on each subject, used for std calc.
     overall_train_mat = np.zeros((num_forms, 1))
     overall_test_mat = np.zeros((num_forms, 1))
+    comp_test_conf_mat = np.zeros((num_forms, 1))
     improved_dir = 'improved' if args.improved else 'baseline'
 
     if not os.path.exists(os.path.join(args.save_dir, 'Taiji', args.fp_size)):
@@ -203,47 +206,51 @@ def taiji_main(args):
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     else:
         device = torch.device('cpu')
-    
+
     # Seed torch and numpy
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
 
-
     # For each subject LOSO
     for i in range(num_subs):
-        print('\n\nTraining subject: {}'.format(i+1))
-        train_data = TaijiData(data_dir='data', subject=i+1, split='train', fp_size=args.fp_size)
-        test_data = TaijiData(data_dir ='data', subject=i+1, split='test', fp_size=args.fp_size)
+        print('\n\nTraining subject: {}'.format(i + 1))
+        train_data = TaijiData(data_dir='data', subject=i + 1, split='train', fp_size=args.fp_size)
+        test_data = TaijiData(data_dir='data', subject=i + 1, split='test', fp_size=args.fp_size)
         train_loader = DataLoader(train_data, batch_size=args.batch_size, shuffle=True)
         test_loader = DataLoader(test_data, batch_size=args.batch_size, shuffle=False)
-        model = MLP(input_dim=train_data.data_dim, hidden_dim=1024, output_dim=num_forms, improved=args.improved).to(device)
+        model = MLP(input_dim=train_data.data_dim, hidden_dim=1024, output_dim=num_forms, improved=args.improved).to(
+            device)
         optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
         criterion = nn.CrossEntropyLoss()
 
         # Train + test the model
         model, train_losses, per_epoch_train_acc, train_preds, train_targets \
-                        = train(model, train_loader, optimizer, criterion, args.num_epochs, args.log_interval, device)
+            = train(model, train_loader, optimizer, criterion, args.num_epochs, args.log_interval, device)
         test_loss, test_acc, test_pred, test_targets = test(model, test_loader, device, criterion)
 
         # Print accs to three decimal places
         sub_train_acc[i] = per_epoch_train_acc[-1]
         sub_test_acc[i] = test_acc
-        print(f'Subject {i+1} Train Accuracy: {per_epoch_train_acc[-1]*100:.3f}')
-        print(f'Subject {i+1} Test Accuracy: {test_acc*100:.3f}')
-        
+        print(f'Subject {i + 1} Train Accuracy: {per_epoch_train_acc[-1] * 100:.3f}')
+        print(f'Subject {i + 1} Test Accuracy: {test_acc * 100:.3f}')
+
         # Save all stats (you can save the model if you choose to)
         if not os.path.exists(os.path.join(args.save_dir, 'Taiji', args.fp_size, improved_dir, 'stats')):
             os.makedirs(os.path.join(args.save_dir, 'Taiji', args.fp_size, improved_dir, 'stats'))
 
-        sub_file = os.path.join(args.save_dir, 'Taiji', args.fp_size, improved_dir, 'stats', 'sub_{}.npz'.format(i+1))
+        sub_file = os.path.join(args.save_dir, 'Taiji', args.fp_size, improved_dir, 'stats', 'sub_{}.npz'.format(i + 1))
         classes_train, conf_mat_train = get_stats(train_preds, train_targets, num_forms)
         classes_test, conf_mat_test = get_stats(test_pred, test_targets, num_forms)
         sub_class_train[i, :] = classes_train
         sub_class_test[i, :] = classes_test
-        overall_train_mat = overall_train_mat + (1/num_subs) * conf_mat_train 
-        overall_test_mat = overall_test_mat + (1/num_subs) * conf_mat_test 
+        overall_train_mat = overall_train_mat + (1 / num_subs) * conf_mat_train
+        overall_test_mat = overall_test_mat + (1 / num_subs) * conf_mat_test
         np.savez(sub_file, train_losses=train_losses, per_epoch_acc=per_epoch_train_acc, test_acc=test_acc,
                  conf_mat_train=conf_mat_train, conf_mat_test=conf_mat_test)
+
+        # save the confusion matrix of current test subject for future comparison
+        if (i + 1) == args.comp_subject_numb:
+            comp_test_conf_mat = comp_test_conf_mat + conf_mat_test
 
         # Note: the code does not save the model, but you may choose to do so with the arg.save_model flag
         if args.save_model:
@@ -251,18 +258,26 @@ def taiji_main(args):
                 os.makedirs(os.path.join(args.save_dir, 'Taiji', args.fp_size, improved_dir, 'model'))
 
             model_save_file = os.path.join(args.save_dir, 'Taiji', args.fp_size,
-                                           improved_dir, 'model', 'state_dict_{}.pt'.format(i+1))
+                                           improved_dir, 'model', 'state_dict_{}.pt'.format(i + 1))
             torch.save(model.state_dict(), model_save_file)
-        
+
     # Save overall stats
     overall_train_acc = np.mean(sub_train_acc)
+    overall_train_acc_std = np.std(sub_train_acc)
     overall_test_acc = np.mean(sub_test_acc)
+    overall_test_acc_std = np.std(sub_test_acc)
     print(f"\n\nOverall Train Accuracy: {overall_train_acc:.3f}")
+    print(f"Overall Train Accuracy std: {overall_train_acc_std:.3f}")
     print(f"Overall Test Accuracy: {overall_test_acc:.3f}")
+    print(f"Overall Test Accuracy std: {overall_test_acc_std:.3f}")
 
     overall_file_name = os.path.join(args.save_dir, 'Taiji', args.fp_size, improved_dir, 'stats', 'overall.npz')
-    np.savez(overall_file_name, sub_train_acc = sub_train_acc, sub_class_train=sub_class_train,
-             sub_test_acc=sub_test_acc, sub_class_test=sub_class_test, overall_train_mat=overall_train_mat, overall_test_mat=overall_test_mat)
+    np.savez(overall_file_name, sub_train_acc=sub_train_acc, sub_class_train=sub_class_train,
+             sub_test_acc=sub_test_acc, sub_class_test=sub_class_test, overall_train_mat=overall_train_mat,
+             overall_test_mat=overall_test_mat, comp_test_conf_mat=comp_test_conf_mat,
+             comp_subj_numb=args.comp_subject_numb, overall_train_acc=overall_train_acc,
+             overall_train_acc_std=overall_train_acc_std, overall_test_acc=overall_test_acc,
+             overall_test_acc_std=overall_test_acc_std)
 
 
 if __name__ == '__main__':
@@ -273,9 +288,8 @@ if __name__ == '__main__':
             wallpaper_main(args)
         visualize(args, dataset='Wallpaper')
         plot_training_curve(args)
-    else: 
+    else:
         if args.train:
             taiji_main(args)
         visualize(args, dataset='Taiji')
         plot_training_curve(args)
-
