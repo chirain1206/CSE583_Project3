@@ -119,6 +119,7 @@ def wallpaper_main(args):
         args (argparse.Namespace): Arguments.
     """
     num_classes = 17
+    improved_dir = 'improved' if args.improved else 'baseline'
     if args.device == 'cuda':
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     else:
@@ -168,9 +169,9 @@ def wallpaper_main(args):
     print(f'\n\nTrain accuracy: {per_epoch_acc[-1] * 100:.3f}')
     print(f'Test accuracy: {test_acc * 100:.3f}')
 
-    if not os.path.exists(os.path.join(args.save_dir, 'Wallpaper', args.test_set, 'stats')):
-        os.makedirs(os.path.join(args.save_dir, 'Wallpaper', args.test_set, 'stats'))
-    overall_file_name = os.path.join(args.save_dir, 'Wallpaper', args.test_set, 'stats', 'overall.npz')
+    if not os.path.exists(os.path.join(args.save_dir, 'Wallpaper', args.test_set, improved_dir, 'stats')):
+        os.makedirs(os.path.join(args.save_dir, 'Wallpaper', args.test_set, improved_dir, 'stats'))
+    overall_file_name = os.path.join(args.save_dir, 'Wallpaper', args.test_set, improved_dir, 'stats', 'overall.npz')
 
     np.savez(overall_file_name, classes_train=classes_train, overall_train_mat=overall_train_mat,
              classes_test=classes_test, overall_test_mat=overall_test_mat,

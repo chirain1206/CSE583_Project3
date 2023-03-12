@@ -287,18 +287,19 @@ def visualize(args, dataset):
     fig.tight_layout()
     plt.savefig(os.path.join(save_dir, 'overall_per_class_test.png'))
 
-    # Overall per class testing data std
-    sub_class_test = overall_results['sub_class_test']
-    std_per_class_test = np.std(sub_class_test, axis=0)
-    fig, ax = plt.subplots(figsize=(10, 5))
-    ax.bar(np.arange(num_classes), std_per_class_test)
-    ax.set_ylabel('Accuracy Standard Deviation')
-    ax.set_xlabel('Class')
-    ax.set_title(f'{dataset} Overall per class testing accuracy standard deviation')
-    ax.set_xticks(np.arange(num_classes))
-    ax.set_xticklabels(label_names, rotation='vertical')
-    fig.tight_layout()
-    plt.savefig(os.path.join(save_dir, 'std_per_class_test.png'))
+    # Overall per class testing data std (Taiji only)
+    if dataset == 'Taiji':
+        sub_class_test = overall_results['sub_class_test']
+        std_per_class_test = np.std(sub_class_test, axis=0)
+        fig, ax = plt.subplots(figsize=(10, 5))
+        ax.bar(np.arange(num_classes), std_per_class_test)
+        ax.set_ylabel('Accuracy Standard Deviation')
+        ax.set_xlabel('Class')
+        ax.set_title(f'{dataset} Overall per class testing accuracy standard deviation')
+        ax.set_xticks(np.arange(num_classes))
+        ax.set_xticklabels(label_names, rotation='vertical')
+        fig.tight_layout()
+        plt.savefig(os.path.join(save_dir, 'std_per_class_test.png'))
 
     # Overall training confusion matrix with sklearns display
     fig, ax = plt.subplots(figsize=(10, 10))
@@ -320,16 +321,17 @@ def visualize(args, dataset):
     fig.tight_layout()
     plt.savefig(os.path.join(save_dir, 'overall_test_conf_mat.png'))
 
-    # Testing confusion matrix of specific subject with sklearns display
-    fig, ax = plt.subplots(figsize=(10, 10))
-    comp_test_conf_mat = overall_results['comp_test_conf_mat']
-    comp_subj_numb = overall_results['comp_subj_numb']
-    disp = ConfusionMatrixDisplay(comp_test_conf_mat, display_labels=label_names)
-    disp.plot(include_values=False, xticks_rotation='vertical', ax=ax, cmap=plt.cm.plasma)
-    disp.ax_.get_images()[0].set_clim(0, 1)
-    ax.set_title(f'{dataset} Testing Confusion Matrix of Subject {comp_subj_numb}')
-    fig.tight_layout()
-    plt.savefig(os.path.join(save_dir, 'comp_test_conf_mat.png'))
+    # Testing confusion matrix of specific subject with sklearns display (Taiji only)
+    if dataset == 'Taiji':
+        fig, ax = plt.subplots(figsize=(10, 10))
+        comp_test_conf_mat = overall_results['comp_test_conf_mat']
+        comp_subj_numb = overall_results['comp_subj_numb']
+        disp = ConfusionMatrixDisplay(comp_test_conf_mat, display_labels=label_names)
+        disp.plot(include_values=False, xticks_rotation='vertical', ax=ax, cmap=plt.cm.plasma)
+        disp.ax_.get_images()[0].set_clim(0, 1)
+        ax.set_title(f'{dataset} Testing Confusion Matrix of Subject {comp_subj_numb}')
+        fig.tight_layout()
+        plt.savefig(os.path.join(save_dir, 'comp_test_conf_mat.png'))
 
     return
 
