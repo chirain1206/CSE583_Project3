@@ -24,9 +24,26 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import Dataset
+from PIL import Image
+from torchvision import transforms
+import shutil
 from torchvision.datasets import ImageFolder
+from torch.utils.data import DataLoader
+from sklearn.manifold import TSNE
 
 # Feel free to modify the arguments as you see fit
+feature_map = {}
+input_map = {}
+def get_features(name):
+    def hook(m, i, o):
+        feature_map[name] = o.detach()
+    return hook
+
+def get_inputs(name):
+    def hook(m, i, o):
+        input_map[name] = i[0].detach()
+    return hook
+
 def arg_parse():
     """
     Parses the arguments.
@@ -56,8 +73,12 @@ def arg_parse():
     parser.add_argument('--test_set', type=str, default='test', help='Test set to use (test or test_challenge)')
     parser.add_argument('--aug_train', action='store_true', help='Use augmented training data')
     parser.add_argument('--improved', action='store_true', help='whether or not to use the improved version')
-    parser.add_argument('--continue_train', action='store_true', help='whether or not to continue training on saved model')
-     
+    parser.add_argument('--load', action='store_true', help='whether or not to load saved model')
+    parser.add_argument('--visualize_fm', action='store_true',
+                        help='whether or not to visualize the feature map')
+    parser.add_argument('--visualize_tSNE', action='store_true',
+                        help='whether or not to visualize tSNE')
+
 
     return parser.parse_args()
 
@@ -166,19 +187,20 @@ def plot_training_curve(args):
         plt.savefig(os.path.join(args.save_dir, args.dataset, args.fp_size, improved_dir, 'plots', 'taiji_training_curve.png'))
         plt.close()
     else:
-        data = np.load(os.path.join(args.save_dir, args.dataset, args.test_set, improved_dir, 'stats', 'overall.npz'))
-        per_epoch_accs = data['per_epoch_acc']
-        fig = plt.figure()
-        plt.plot(per_epoch_accs)
-        plt.xlabel('Epoch')
-        plt.ylabel('Accuracy')
-        plt.title(f'Wallpaper Training Accuracy ({args.test_set})')
-        plt.savefig(os.path.join(args.save_dir, args.dataset, args.test_set, improved_dir, 'plots', 'wallpaper_training_curve.png'))
-        plt.close()
+        if args.train:
+            data = np.load(os.path.join(args.save_dir, args.dataset, args.test_set, improved_dir, 'stats', 'overall.npz'))
+            per_epoch_accs = data['per_epoch_acc']
+            fig = plt.figure()
+            plt.plot(per_epoch_accs)
+            plt.xlabel('Epoch')
+            plt.ylabel('Accuracy')
+            plt.title(f'Wallpaper Training Accuracy ({args.test_set})')
+            plt.savefig(os.path.join(args.save_dir, args.dataset, args.test_set, improved_dir, 'plots', 'wallpaper_training_curve.png'))
+            plt.close()
 
         
 
-def visualize(args, dataset):
+def visualize(args, dataset, baseline_model=None, improved_model=None):
     """
     Visualize the results
     Args:
@@ -241,10 +263,6 @@ def visualize(args, dataset):
         overall_test_acc_std = overall_results['overall_test_acc_std']
         fig, ax = plt.subplots()
         ax2 = ax.twinx()
-        # ax.bar([0], [overall_train_acc], width=0.35, label='Accuracy', color='blue')
-        # ax.bar([0.35], [overall_test_acc], width=0.35, label='Accuracy', color='orange')
-        # ax2.bar([1], [overall_train_acc_std], width=0.35, label='Standard Deviation', color='blue')
-        # ax2.bar([1.35], [overall_test_acc_std], width=0.35, label='Standard Deviation', color='orange')
         legend1 = ax.bar([0], [overall_train_acc], width=0.4, label='Accuracy', color='blue')
         legend2 = ax2.bar([0.4], [overall_train_acc_std], width=0.4, label='Standard Deviation', color='orange')
         ax.bar([1], [overall_test_acc], width=0.4, label='Accuracy', color='blue')
@@ -253,12 +271,50 @@ def visualize(args, dataset):
         ax2.set_ylabel('Standard Deviation')
         ax.set_xlabel('Training or Testing')
         ax.set_title('Training/Testing overall accuracy & std, averaged on all iterations')
-        # Make the x-axis labels start from 1
         ax.set_xticks([0.2, 1.2])
         ax.set_xticklabels(['Training', 'Testing'])
         ax.legend(handles=[legend1, legend2], loc='upper center')
         fig.tight_layout()
         plt.savefig(os.path.join(save_dir, 'averaged overall acc and std.png'))
+        plt.close()
+
+    # Overall train/test acc and std for Wallpaper
+    if dataset == 'Wallpaper':
+        sub_class_train = overall_results['sub_class_train']
+        sub_class_test = overall_results['sub_class_test']
+        overall_train_acc = np.mean(sub_class_train)
+        overall_train_acc_std = np.std(sub_class_train)
+        overall_test_acc = np.mean(sub_class_test)
+        overall_test_acc_std = np.std(sub_class_test)
+
+        fig, ax = plt.subplots()
+        ax2 = ax.twinx()
+        ax.bar([0], [overall_train_acc], width=0.4, label='Accuracy', color='blue')
+        ax2.bar([1], [overall_train_acc_std], width=0.4, label='Standard Deviation', color='orange')
+        ax.set_ylabel('Accuracy')
+        ax2.set_ylabel('Standard Deviation')
+        ax.set_xlabel('Overall accuracy and standard deviation')
+        ax.set_title('Overall training accuracy & std')
+        ax.set_xticks([0,1])
+        ax.set_xticklabels(['Accuracy', 'Standard Deviation'])
+        ax.legend(loc='upper center')
+        fig.tight_layout()
+        plt.savefig(os.path.join(save_dir, 'training overall accuracy and std.png'))
+        plt.close()
+
+        fig, ax = plt.subplots()
+        ax2 = ax.twinx()
+        ax.bar([0], [overall_test_acc], width=0.4, label='Accuracy', color='blue')
+        ax2.bar([1], [overall_test_acc_std], width=0.4, label='Standard Deviation', color='orange')
+        ax.set_ylabel('Accuracy')
+        ax2.set_ylabel('Standard Deviation')
+        ax.set_xlabel('Overall accuracy and standard deviation')
+        ax.set_title('Overall testing accuracy & std')
+        ax.set_xticks([0,1])
+        ax.set_xticklabels(['Accuracy', 'Standard Deviation'])
+        ax.legend(loc='upper center')
+        fig.tight_layout()
+        plt.savefig(os.path.join(save_dir, 'testing overall accuracy and std.png'))
         plt.close()
 
     # Overall per class training data. Tilt the x-axis labels by 45 degrees
@@ -333,6 +389,129 @@ def visualize(args, dataset):
         ax.set_title(f'{dataset} Testing Confusion Matrix of Subject {comp_subj_numb}')
         fig.tight_layout()
         plt.savefig(os.path.join(save_dir, 'comp_test_conf_mat.png'))
+
+    # Visualize t-SNE
+    if args.visualize_tSNE:
+        save_tSNE_path = os.path.join(args.save_dir, 'Wallpaper', 't-SNE')
+        if not os.path.exists(save_tSNE_path):
+            os.mkdir(save_tSNE_path)
+
+        # run through test subset to retrieve visualization data
+        test_transform = transforms.Compose([
+            transforms.Resize((args.img_size, args.img_size)),
+            transforms.Grayscale(),
+            transforms.ToTensor(),
+            transforms.Normalize((0.5,), (0.5,)),
+        ])
+        test_dataset = ImageFolder(os.path.join(args.data_root, 'Wallpaper', args.test_set), transform=test_transform)
+        test_loader = DataLoader(test_dataset, batch_size=10*args.batch_size, shuffle=False)
+
+        device = torch.device('cpu')
+        # load model parameters
+        model_save_path = os.path.join(args.save_dir, 'Wallpaper', args.test_set,
+                                       improved_dir, 'model', 'model.pt')
+        checkpoint = torch.load(model_save_path)
+        if args.improved:
+            model = improved_model(input_channels=1, img_size=args.img_size, num_classes=num_classes)
+        else:
+            model = baseline_model(input_channels=1, img_size=args.img_size, num_classes=num_classes)
+        model.load_state_dict(checkpoint['model_state_dict'])
+        model.to(device)
+        model.eval()
+
+        # register hooks to retrieve conv and fully connected layer output
+        model.fc_2.register_forward_hook(get_features('fcn'))
+
+        # run through one batch size and plot the t-SNE
+        for batch_idx, (data, target) in enumerate(test_loader):
+            data, target = data.to(device), target.to(device)
+            model(data)
+
+            tSNE_embed = TSNE().fit_transform(feature_map['fcn'])
+            x_coor = [embed[0] for embed in tSNE_embed]
+            y_coor = [embed[1] for embed in tSNE_embed]
+            fig, ax = plt.subplots(figsize=(10, 5))
+            plt.scatter(x_coor, y_coor)
+            ax.set_ylabel('dim 2')
+            ax.set_xlabel('dim 1')
+            ax.set_title('t-SNE visualization on the last fully connected layer (640 data points)')
+            fig.tight_layout()
+            plt.savefig(os.path.join(save_tSNE_path, 't-SNE.png'))
+            break
+
+    # Visualize feature map of chosen convolutional layer with 17 images from 17 wallpaper groups and perform t-SNE
+    if args.visualize_fm:
+        # create visualization image folder for testing
+        target_image_path = os.path.join(args.data_root, 'Wallpaper', 'visualization')
+        if not os.path.exists(target_image_path):
+            image_set_path = os.path.join(args.data_root, 'Wallpaper', 'test')
+
+            for sub_dir in os.listdir(image_set_path):
+                image_dir = os.path.join(image_set_path, sub_dir)
+                target_image_path = os.path.join(args.data_root, 'Wallpaper', 'visualization', sub_dir)
+                os.makedirs(target_image_path)
+                for image in os.listdir(image_dir):
+                    orig_image_path = os.path.join(image_dir, image)
+                    shutil.copy(orig_image_path, target_image_path)
+                    break
+
+        if dataset == 'Wallpaper':
+            device = torch.device('cpu')
+
+            # load model parameters
+            model_save_path = os.path.join(args.save_dir, 'Wallpaper', args.test_set,
+                                           improved_dir, 'model', 'model.pt')
+            checkpoint = torch.load(model_save_path)
+            if args.improved:
+                model = improved_model(input_channels=1, img_size=args.img_size, num_classes=num_classes)
+            else:
+                model = baseline_model(input_channels=1, img_size=args.img_size, num_classes=num_classes)
+            model.load_state_dict(checkpoint['model_state_dict'])
+            model.to(device)
+            model.eval()
+
+            # register hooks to retrieve conv and fully connected layer output
+            model.first_conv.register_forward_hook(get_features('conv'))
+
+            # pass images into CNN
+            test_transform = transforms.Compose([
+                transforms.Resize((args.img_size, args.img_size)),
+                transforms.Grayscale(),
+                transforms.ToTensor(),
+                transforms.Normalize((0.5,), (0.5,)),
+            ])
+            visualize_dataset = ImageFolder(os.path.join(args.data_root, 'Wallpaper', 'visualization'), transform=test_transform)
+            visualize_loader = DataLoader(visualize_dataset, batch_size=args.batch_size, shuffle=False)
+            for batch_idx, (data, target) in enumerate(visualize_loader):
+                data, target = data.to(device), target.to(device)
+                model(data)
+
+            # create a mapping from index to image directory
+            dir2idx_dict = visualize_dataset.class_to_idx
+            idx2dir_dict = {}
+            for dir_name, idx in dir2idx_dict.items():
+                idx2dir_dict[idx] = dir_name
+
+            # feature maps visualization
+            save_fm_path = os.path.join(args.save_dir, 'Wallpaper', 'conv_layer_feature_map')
+            if not os.path.exists(save_fm_path):
+                os.mkdir(save_fm_path)
+
+            act = feature_map['conv'].squeeze()
+            fig, ax = plt.subplots(2)
+            ax[0].imshow(act[0][0])
+            for img_idx in range(act.size(0)):
+                fig, ax = plt.subplots(6, 6)
+                for idx in range(act.size(1)):
+                    ax[idx // 6][idx % 6].imshow(act[img_idx][idx])
+                    ax[idx // 6][idx % 6].axis('off')
+                # remove unused subplots
+                for idx in range(act.size(1), 36):
+                    fig.delaxes(ax[idx // 6][idx % 6])
+
+                fig.tight_layout()
+                plt.savefig(os.path.join(save_fm_path, idx2dir_dict[img_idx] + '.png'))
+                plt.close()
 
     return
 
