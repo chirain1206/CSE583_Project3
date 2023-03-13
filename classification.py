@@ -150,28 +150,42 @@ def wallpaper_main(args):
             transforms.RandomAffine(degrees=(0, 360), translate=(0.5, 0.5), scale=(0.5, 2)),
             transforms.RandomResizedCrop(size=(args.img_size, args.img_size)),
         ])
-        aug_transform_diff1 = transforms.RandomChoice([transforms.RandomAffine(degrees=(0, 360), translate=(0.5, 0.5), scale=(0.5, 2)),
-                                                  transforms.RandomAffine(degrees=(0, 360)),
-                                                  transforms.RandomAffine(degrees=0, translate=(0.5, 0.5)),
-                                                  transforms.RandomAffine(degrees=0, scale=(0.5, 2)),
-                                                  transforms.RandomHorizontalFlip(p=1),
-                                                  transforms.RandomVerticalFlip(p=1),
-                                                  transforms.RandomResizedCrop(size=(args.img_size, args.img_size))])
-        aug_transform_diff2 = transforms.RandomChoice([aux_transform1, aux_transform2, aux_transform3])
-        aug_transform_diff5 = transforms.RandomApply(
+        aux_transform4 = transforms.Compose([
+            transforms.RandomVerticalFlip(p=1),
+            transforms.RandomResizedCrop(size=(args.img_size, args.img_size)),
+        ])
+        aux_transform5 = transforms.Compose([
+            transforms.RandomHorizontalFlip(p=1),
+            transforms.RandomResizedCrop(size=(args.img_size, args.img_size)),
+        ])
+        aux_transform6 = transforms.Compose([
+            transforms.RandomVerticalFlip(p=1),
+            transforms.RandomHorizontalFlip(p=1)
+        ])
+        aug_transform_diff1 = transforms.RandomChoice(
+            [transforms.RandomAffine(degrees=(0, 360), translate=(0.5, 0.5), scale=(0.5, 2)),
+             # transforms.RandomAffine(degrees=(0, 360)),
+             # transforms.RandomAffine(degrees=0, translate=(0.5, 0.5)),
+             # transforms.RandomAffine(degrees=0, scale=(0.5, 2)),
+             transforms.RandomHorizontalFlip(p=1),
+             transforms.RandomVerticalFlip(p=1),
+             transforms.RandomResizedCrop(size=(args.img_size, args.img_size))])
+        aug_transform_diff2 = transforms.RandomChoice([aux_transform1, aux_transform2, aux_transform3, aux_transform4,
+                                                       aux_transform5, aux_transform6])
+        aug_transform_diff5 = transforms.Compose(
             [
-             # transforms.RandomAffine(degrees=(0, 360), translate=(0.1, 0.3), scale=(0.5, 1)),
-             transforms.RandomAffine(degrees=(0, 360)),
-             transforms.RandomAffine(degrees=0, translate=(0.5, 0.5)),
-             transforms.RandomAffine(degrees=0, scale=(0.5, 2)),
-             transforms.RandomHorizontalFlip(p=0.4),
-             transforms.RandomVerticalFlip(p=0.4),
-             transforms.RandomResizedCrop(size=(args.img_size, args.img_size))], p=0.8)
-        aug_transform_diff3 = transforms.RandomChoice([aug_transform_diff1, aug_transform_diff2])
-        aug_transform_diff4 = transforms.RandomChoice([aug_transform_diff2, aug_transform_diff5])
+                transforms.RandomAffine(degrees=(0, 360), translate=(0.5, 0.5), scale=(0.5, 2)),
+                # transforms.RandomAffine(degrees=(0, 360)),
+                # transforms.RandomAffine(degrees=0, translate=(0.5, 0.5)),
+                # transforms.RandomAffine(degrees=0, scale=(0.5, 2)),
+                transforms.RandomHorizontalFlip(p=1),
+                transforms.RandomVerticalFlip(p=1),
+                transforms.RandomResizedCrop(size=(args.img_size, args.img_size))])
+        aug_transform_diff3 = transforms.RandomChoice([aug_transform_diff1, aug_transform_diff2, aug_transform_diff5])
+        aug_transform_diff4 = transforms.RandomApply([aug_transform_diff3], p=0.8)
 
         train_transform = transforms.Compose([
-            aug_transform_diff3,
+            aug_transform_diff4,
             transforms.Resize((args.img_size, args.img_size)),
             transforms.Grayscale(),
             transforms.ToTensor(),
@@ -199,34 +213,35 @@ def wallpaper_main(args):
 
     print(f"Training on {len(train_dataset)} images, testing on {len(test_dataset)} images.")
     # Initialize the model, optimizer, and loss function
+    load_success = False
+    if args.improved:
+        model = CNN2(input_channels=1, img_size=args.img_size, num_classes=num_classes)
+    else:
+        model = CNN(input_channels=1, img_size=args.img_size, num_classes=num_classes)
     if args.load:
         model_save_path = os.path.join(args.save_dir, 'Wallpaper', args.test_set,
                                        improved_dir, 'model', 'model.pt')
-        checkpoint = torch.load(model_save_path)
+        if os.path.exists(model_save_path):
+            load_success = True
+            checkpoint = torch.load(model_save_path)
 
-        if args.improved:
-            model = CNN2(input_channels=1, img_size=args.img_size, num_classes=num_classes)
-        else:
-            model = CNN(input_channels=1, img_size=args.img_size, num_classes=num_classes)
-        model.load_state_dict(checkpoint['model_state_dict'])
+            model.load_state_dict(checkpoint['model_state_dict'])
+            model.to(device)
+
+            optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
+            optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+            optimizer.zero_grad()
+
+            epoch = checkpoint['epoch']
+    if not load_success:
         model.to(device)
-
-        optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
-        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-        optimizer.zero_grad()
-
-        epoch = checkpoint['epoch']
-    else:
-        if args.improved:
-            model = CNN2(input_channels=1, img_size=args.img_size, num_classes=num_classes).to(device)
-        else:
-            model = CNN(input_channels=1, img_size=args.img_size, num_classes=num_classes).to(device)
         optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
     criterion = nn.CrossEntropyLoss()
 
     # Train + test the model
     if args.train:
-        model, per_epoch_loss, per_epoch_acc, train_preds, train_targets = train(model, train_loader, optimizer, criterion,
+        model, per_epoch_loss, per_epoch_acc, train_preds, train_targets = train(model, train_loader, optimizer,
+                                                                                 criterion,
                                                                                  epoch, args.num_epochs,
                                                                                  args.log_interval, device)
         test_loss, test_acc, test_preds, test_targets = test(model, test_loader, device, criterion)
@@ -240,7 +255,8 @@ def wallpaper_main(args):
 
         if not os.path.exists(os.path.join(args.save_dir, 'Wallpaper', args.test_set, improved_dir, 'stats')):
             os.makedirs(os.path.join(args.save_dir, 'Wallpaper', args.test_set, improved_dir, 'stats'))
-        overall_file_name = os.path.join(args.save_dir, 'Wallpaper', args.test_set, improved_dir, 'stats', 'overall.npz')
+        overall_file_name = os.path.join(args.save_dir, 'Wallpaper', args.test_set, improved_dir, 'stats',
+                                         'overall.npz')
 
         np.savez(overall_file_name, classes_train=classes_train, overall_train_mat=overall_train_mat,
                  classes_test=classes_test, overall_test_mat=overall_test_mat,
@@ -259,7 +275,8 @@ def wallpaper_main(args):
 
         if not os.path.exists(os.path.join(args.save_dir, 'Wallpaper', args.test_set, improved_dir, 'stats')):
             os.makedirs(os.path.join(args.save_dir, 'Wallpaper', args.test_set, improved_dir, 'stats'))
-        overall_file_name = os.path.join(args.save_dir, 'Wallpaper', args.test_set, improved_dir, 'stats', 'overall.npz')
+        overall_file_name = os.path.join(args.save_dir, 'Wallpaper', args.test_set, improved_dir, 'stats',
+                                         'overall.npz')
 
         np.savez(overall_file_name, classes_train=classes_train, overall_train_mat=overall_train_mat,
                  classes_test=classes_test, overall_test_mat=overall_test_mat,

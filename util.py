@@ -36,12 +36,12 @@ feature_map = {}
 input_map = {}
 def get_features(name):
     def hook(m, i, o):
-        feature_map[name] = o.detach()
+        feature_map[name] = o.detach().cpu()
     return hook
 
 def get_inputs(name):
     def hook(m, i, o):
-        input_map[name] = i[0].detach()
+        input_map[name] = i[0].detach().cpu()
     return hook
 
 def arg_parse():
@@ -62,7 +62,7 @@ def arg_parse():
     parser.add_argument('--lr', type=float, default=0.001, help='Learning rate')
     parser.add_argument('--log_dir', type=str, default='logs', help='Directory to save logs')
     parser.add_argument('--log_interval', type=int, default=1, help='Print loss every log_interval epochs, feel free to change')
-    parser.add_argument('--train' , action='store_true', help='Train the model')
+    parser.add_argument('--train', action='store_true', help='Train the model')
     parser.add_argument('--save_model', action='store_true', help='Save the model')
     # Taji specific
     parser.add_argument('--num_subs', type=int, default=10, help='Number of subjects to train and test on')
@@ -396,17 +396,35 @@ def visualize(args, dataset, baseline_model=None, improved_model=None):
         if not os.path.exists(save_tSNE_path):
             os.mkdir(save_tSNE_path)
 
-        # run through test subset to retrieve visualization data
+        # create t-SNE visualization image folder for testing
+        target_image_path = os.path.join(args.data_root, 'Wallpaper', 'visualization_tSNE')
+        if not os.path.exists(target_image_path):
+            image_set_path = os.path.join(args.data_root, 'Wallpaper', 'test')
+
+            # extract 20 images from each category
+            for sub_dir in os.listdir(image_set_path):
+                img_count = 0
+                image_dir = os.path.join(image_set_path, sub_dir)
+                target_image_path = os.path.join(args.data_root, 'Wallpaper', 'visualization_tSNE', sub_dir)
+                os.makedirs(target_image_path)
+                for image in os.listdir(image_dir):
+                    orig_image_path = os.path.join(image_dir, image)
+                    shutil.copy(orig_image_path, target_image_path)
+                    img_count += 1
+                    if img_count >= 20:
+                        break
+
+        # run through t-SNE visualization image folder to retrieve visualization data
         test_transform = transforms.Compose([
             transforms.Resize((args.img_size, args.img_size)),
             transforms.Grayscale(),
             transforms.ToTensor(),
             transforms.Normalize((0.5,), (0.5,)),
         ])
-        test_dataset = ImageFolder(os.path.join(args.data_root, 'Wallpaper', args.test_set), transform=test_transform)
-        test_loader = DataLoader(test_dataset, batch_size=10*args.batch_size, shuffle=False)
+        visualize_dataset = ImageFolder(os.path.join(args.data_root, 'Wallpaper', 'visualization_tSNE'), transform=test_transform)
+        visualize_loader = DataLoader(visualize_dataset, batch_size=10*args.batch_size, shuffle=False)
 
-        device = torch.device('cpu')
+        device = torch.device(args.device)
         # load model parameters
         model_save_path = os.path.join(args.save_dir, 'Wallpaper', args.test_set,
                                        improved_dir, 'model', 'model.pt')
@@ -420,98 +438,102 @@ def visualize(args, dataset, baseline_model=None, improved_model=None):
         model.eval()
 
         # register hooks to retrieve conv and fully connected layer output
-        model.fc_2.register_forward_hook(get_features('fcn'))
+        model.fc_2.register_forward_hook(get_inputs('fcn'))
 
         # run through one batch size and plot the t-SNE
-        for batch_idx, (data, target) in enumerate(test_loader):
+        for batch_idx, (data, target) in enumerate(visualize_loader):
             data, target = data.to(device), target.to(device)
             model(data)
 
-            tSNE_embed = TSNE().fit_transform(feature_map['fcn'])
+            # get color palette
+            cmap = plt.cm.get_cmap('hsv', 17)
+
+            tSNE_embed = TSNE().fit_transform(input_map['fcn'])
             x_coor = [embed[0] for embed in tSNE_embed]
             y_coor = [embed[1] for embed in tSNE_embed]
+            target = target.cpu()
             fig, ax = plt.subplots(figsize=(10, 5))
-            plt.scatter(x_coor, y_coor)
+            for idx in range(len(x_coor)):
+                plt.scatter(x_coor[idx], y_coor[idx], color=cmap(target[idx]))
             ax.set_ylabel('dim 2')
             ax.set_xlabel('dim 1')
-            ax.set_title('t-SNE visualization on the last fully connected layer (640 data points)')
+            ax.set_title('t-SNE visualization on the last fully connected layer (20 images per class)')
             fig.tight_layout()
             plt.savefig(os.path.join(save_tSNE_path, 't-SNE.png'))
-            break
 
     # Visualize feature map of chosen convolutional layer with 17 images from 17 wallpaper groups and perform t-SNE
     if args.visualize_fm:
-        # create visualization image folder for testing
-        target_image_path = os.path.join(args.data_root, 'Wallpaper', 'visualization')
+        # create feature map visualization image folder for testing
+        target_image_path = os.path.join(args.data_root, 'Wallpaper', 'visualization_fm')
         if not os.path.exists(target_image_path):
             image_set_path = os.path.join(args.data_root, 'Wallpaper', 'test')
 
+            # extract 1 image per class
             for sub_dir in os.listdir(image_set_path):
                 image_dir = os.path.join(image_set_path, sub_dir)
-                target_image_path = os.path.join(args.data_root, 'Wallpaper', 'visualization', sub_dir)
+                target_image_path = os.path.join(args.data_root, 'Wallpaper', 'visualization_fm', sub_dir)
                 os.makedirs(target_image_path)
                 for image in os.listdir(image_dir):
                     orig_image_path = os.path.join(image_dir, image)
                     shutil.copy(orig_image_path, target_image_path)
                     break
 
-        if dataset == 'Wallpaper':
-            device = torch.device('cpu')
+        device = torch.device(args.device)
 
-            # load model parameters
-            model_save_path = os.path.join(args.save_dir, 'Wallpaper', args.test_set,
-                                           improved_dir, 'model', 'model.pt')
-            checkpoint = torch.load(model_save_path)
-            if args.improved:
-                model = improved_model(input_channels=1, img_size=args.img_size, num_classes=num_classes)
-            else:
-                model = baseline_model(input_channels=1, img_size=args.img_size, num_classes=num_classes)
-            model.load_state_dict(checkpoint['model_state_dict'])
-            model.to(device)
-            model.eval()
+        # load model parameters
+        model_save_path = os.path.join(args.save_dir, 'Wallpaper', args.test_set,
+                                       improved_dir, 'model', 'model.pt')
+        checkpoint = torch.load(model_save_path)
+        if args.improved:
+            model = improved_model(input_channels=1, img_size=args.img_size, num_classes=num_classes)
+        else:
+            model = baseline_model(input_channels=1, img_size=args.img_size, num_classes=num_classes)
+        model.load_state_dict(checkpoint['model_state_dict'])
+        model.to(device)
+        model.eval()
 
-            # register hooks to retrieve conv and fully connected layer output
-            model.first_conv.register_forward_hook(get_features('conv'))
+        # register hooks to retrieve conv and fully connected layer output
+        model.first_conv.register_forward_hook(get_features('conv'))
 
-            # pass images into CNN
-            test_transform = transforms.Compose([
-                transforms.Resize((args.img_size, args.img_size)),
-                transforms.Grayscale(),
-                transforms.ToTensor(),
-                transforms.Normalize((0.5,), (0.5,)),
-            ])
-            visualize_dataset = ImageFolder(os.path.join(args.data_root, 'Wallpaper', 'visualization'), transform=test_transform)
-            visualize_loader = DataLoader(visualize_dataset, batch_size=args.batch_size, shuffle=False)
-            for batch_idx, (data, target) in enumerate(visualize_loader):
-                data, target = data.to(device), target.to(device)
-                model(data)
+        # pass images into CNN
+        test_transform = transforms.Compose([
+            transforms.Resize((args.img_size, args.img_size)),
+            transforms.Grayscale(),
+            transforms.ToTensor(),
+            transforms.Normalize((0.5,), (0.5,)),
+        ])
+        visualize_dataset = ImageFolder(os.path.join(args.data_root, 'Wallpaper', 'visualization_fm'), transform=test_transform)
+        visualize_loader = DataLoader(visualize_dataset, batch_size=args.batch_size, shuffle=False)
+        for batch_idx, (data, target) in enumerate(visualize_loader):
+            data, target = data.to(device), target.to(device)
+            model(data)
 
-            # create a mapping from index to image directory
-            dir2idx_dict = visualize_dataset.class_to_idx
-            idx2dir_dict = {}
-            for dir_name, idx in dir2idx_dict.items():
-                idx2dir_dict[idx] = dir_name
+        # create a mapping from index to image directory
+        dir2idx_dict = visualize_dataset.class_to_idx
+        idx2dir_dict = {}
+        for dir_name, idx in dir2idx_dict.items():
+            idx2dir_dict[idx] = dir_name
 
-            # feature maps visualization
-            save_fm_path = os.path.join(args.save_dir, 'Wallpaper', 'conv_layer_feature_map')
-            if not os.path.exists(save_fm_path):
-                os.mkdir(save_fm_path)
+        # feature maps visualization
+        save_fm_path = os.path.join(args.save_dir, 'Wallpaper', 'conv_layer_feature_map')
+        if not os.path.exists(save_fm_path):
+            os.mkdir(save_fm_path)
 
-            act = feature_map['conv'].squeeze()
-            fig, ax = plt.subplots(2)
-            ax[0].imshow(act[0][0])
-            for img_idx in range(act.size(0)):
-                fig, ax = plt.subplots(6, 6)
-                for idx in range(act.size(1)):
-                    ax[idx // 6][idx % 6].imshow(act[img_idx][idx])
-                    ax[idx // 6][idx % 6].axis('off')
-                # remove unused subplots
-                for idx in range(act.size(1), 36):
-                    fig.delaxes(ax[idx // 6][idx % 6])
+        act = feature_map['conv'].squeeze()
+        fig, ax = plt.subplots(2)
+        ax[0].imshow(act[0][0])
+        for img_idx in range(act.size(0)):
+            fig, ax = plt.subplots(6, 6)
+            for idx in range(act.size(1)):
+                ax[idx // 6][idx % 6].imshow(act[img_idx][idx])
+                ax[idx // 6][idx % 6].axis('off')
+            # remove unused subplots
+            for idx in range(act.size(1), 36):
+                fig.delaxes(ax[idx // 6][idx % 6])
 
-                fig.tight_layout()
-                plt.savefig(os.path.join(save_fm_path, idx2dir_dict[img_idx] + '.png'))
-                plt.close()
+            fig.tight_layout()
+            plt.savefig(os.path.join(save_fm_path, idx2dir_dict[img_idx] + '.png'))
+            plt.close()
 
     return
 
