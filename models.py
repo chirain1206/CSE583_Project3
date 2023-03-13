@@ -90,4 +90,83 @@ class CNN2(nn.Module):
             num_classes (int): number of classes in the dataset
         """
         super(CNN2, self).__init__()
-        raise NotImplementedError
+        self.input_channels = input_channels
+        self.num_classes = num_classes
+        self.img_size = img_size
+        self.conv_layers= nn.Sequential(
+            nn.Conv2d(self.input_channels, 32, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            nn.Conv2d(32, 64, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            nn.Conv2d(64, 128, kernel_size=3, padding=1),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            nn.ReLU(),
+            # nn.Conv2d(128, 256, kernel_size=3, padding=1),
+            # nn.ReLU(),
+            # nn.MaxPool2d(kernel_size=2, stride=2)
+        )
+        self.fc_1_layers = nn.Sequential(
+            nn.Linear(128 * (self.img_size // 8) * (self.img_size // 8), 1024),
+            # nn.Linear(256 * (self.img_size // 16) * (self.img_size // 16), 1024),
+            nn.ReLU()
+        )
+        self.dropout = nn.Dropout(p=0.2)
+        self.fc_2 = nn.Linear(1024, self.num_classes)
+
+    def forward(self, x):
+        x = self.conv_layers(x)
+        x = x.view(x.size(0), -1)
+        x = self.fc_1_layers(x)
+        x = self.dropout(x)
+        x = self.fc_2(x)
+        return x
+
+class CNN3(nn.Module):
+    def __init__(self, input_channels=1, img_size=32, num_classes=17):
+        """
+        Args:
+            input_channels (int): number of channels in the input image
+            img_size (int): size of the input image (img_size x img_size)
+            num_classes (int): number of classes in the dataset
+        """
+        super(CNN3, self).__init__()
+        self.input_channels = input_channels
+        self.num_classes = num_classes
+        self.img_size = img_size
+        self.conv_layers= nn.Sequential(
+            nn.Conv2d(self.input_channels, 32, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.Conv2d(32, 32, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            nn.Conv2d(32, 64, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.Conv2d(64, 64, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            nn.Conv2d(64, 128, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.Conv2d(128, 128, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            # nn.Conv2d(128, 256, kernel_size=3, padding=1),
+            # nn.ReLU(),
+            # nn.MaxPool2d(kernel_size=2, stride=2)
+        )
+        self.fc_1_layers = nn.Sequential(
+            nn.Linear(128 * (self.img_size // 8) * (self.img_size // 8), 1024),
+            # nn.Linear(256 * (self.img_size // 16) * (self.img_size // 16), 1024),
+            nn.ReLU()
+        )
+        self.dropout = nn.Dropout(p=0.2)
+        self.fc_2 = nn.Linear(1024, self.num_classes)
+
+    def forward(self, x):
+        x = self.conv_layers(x)
+        x = x.view(x.size(0), -1)
+        x = self.fc_1_layers(x)
+        x = self.dropout(x)
+        x = self.fc_2(x)
+        return x

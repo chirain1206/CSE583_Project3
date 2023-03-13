@@ -56,6 +56,7 @@ def arg_parse():
     parser.add_argument('--test_set', type=str, default='test', help='Test set to use (test or test_challenge)')
     parser.add_argument('--aug_train', action='store_true', help='Use augmented training data')
     parser.add_argument('--improved', action='store_true', help='whether or not to use the improved version')
+    parser.add_argument('--continue_train', action='store_true', help='whether or not to continue training on saved model')
      
 
     return parser.parse_args()

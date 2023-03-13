@@ -60,7 +60,7 @@ def test(model, test_loader, device, criterion):
 
 
 #  Note log_interval doesn't actually log to a file but is used for printing. This can be changed if you want to log to a file.
-def train(model, train_loader, optimizer, criterion, epochs,
+def train(model, train_loader, optimizer, criterion, cur_epoch, epochs,
           log_interval, device):
     """
     Train the model and periodically log the loss and accuracy.
@@ -69,6 +69,7 @@ def train(model, train_loader, optimizer, criterion, epochs,
         train_loader (torch.utils.data.DataLoader): Training data loader.
         optimizer (torch.optim.Optimizer): Optimizer to use.
         criterion (torch.nn.Module): Loss function to use.
+        cur_epoch (int): The epoch number to continue with
         epochs (int): Number of epochs to train for.
         log_interval (int): Print loss every log_interval epochs.
         device (torch.device): Device to use (cuda or cpu).
@@ -105,7 +106,7 @@ def train(model, train_loader, optimizer, criterion, epochs,
         train_acc = correct / len(train_loader.dataset)
         per_epoch_acc.append(train_acc)
         if epoch % log_interval == 0:
-            print('Epoch: {}, Loss: {}, Acc: {}'.format(epoch, train_loss, train_acc))
+            print('Epoch: {}, Loss: {}, Acc: {}'.format(epoch + cur_epoch, train_loss, train_acc))
 
     preds = np.concatenate(preds)
     targets = np.concatenate(targets)
@@ -119,6 +120,7 @@ def wallpaper_main(args):
         args (argparse.Namespace): Arguments.
     """
     num_classes = 17
+    epoch = 0
     improved_dir = 'improved' if args.improved else 'baseline'
     if args.device == 'cuda':
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -136,29 +138,91 @@ def wallpaper_main(args):
 
     # TODO: Augment the training data given the transforms in the assignment description.
     if args.aug_train:
-        raise NotImplementedError
+        aux_transform = transforms.Compose([
+            transforms.RandomAffine(degrees=(0, 360), translate=(0.1, 0.3), scale=(0.5, 1)),
+            transforms.RandomHorizontalFlip(p=0.5),
+            transforms.RandomVerticalFlip(p=0.5),
+            transforms.RandomResizedCrop(size=(args.img_size, args.img_size)),
+        ])
+        aug_transform1 = transforms.RandomApply(
+            [
+             # transforms.RandomAffine(degrees=(0, 360), translate=(0.1, 0.3), scale=(0.5, 1)),
+             transforms.RandomAffine(degrees=(0, 360)),
+             transforms.RandomAffine(degrees=0, translate=(0.1, 0.3)),
+             transforms.RandomAffine(degrees=0, scale=(0.5, 1)),
+             transforms.RandomHorizontalFlip(p=1),
+             transforms.RandomVerticalFlip(p=1),
+             transforms.RandomResizedCrop(size=(args.img_size, args.img_size))], p=0.8)
+        aug_transform2 = transforms.RandomChoice([transforms.RandomAffine(degrees=(0, 360), translate=(0.1, 0.3), scale=(0.5, 1)),
+                                                  transforms.RandomAffine(degrees=(0, 360)),
+                                                  transforms.RandomAffine(degrees=0, translate=(0.1, 0.3)),
+                                                  transforms.RandomAffine(degrees=0, scale=(0.5, 1)),
+                                                  transforms.RandomHorizontalFlip(p=1),
+                                                  transforms.RandomVerticalFlip(p=1),
+                                                  transforms.RandomResizedCrop(size=(args.img_size, args.img_size))])
+        aug_transform3 = transforms.RandomApply([aug_transform2], p=0.8)
+
+        train_transform = transforms.Compose([
+            # transforms.RandomAffine(degrees=(0, 360), translate=(0.1, 0.3), scale=(0.5, 1)),
+            # transforms.RandomHorizontalFlip(p=0.2),
+            # transforms.RandomVerticalFlip(p=0.2),
+            # transforms.RandomResizedCrop(size=(args.img_size, args.img_size)),
+            aug_transform1,
+            transforms.Resize((args.img_size, args.img_size)),
+            transforms.Grayscale(),
+            transforms.ToTensor(),
+            transforms.Normalize((0.5,), (0.5,)),
+        ])
+    else:
+        train_transform = transforms.Compose([
+            transforms.Resize((args.img_size, args.img_size)),
+            transforms.Grayscale(),
+            transforms.ToTensor(),
+            transforms.Normalize((0.5,), (0.5,)),
+        ])
 
     # Compose the transforms that will be applied to the images. Feel free to adjust this.
-    transform = transforms.Compose([
+    test_transform = transforms.Compose([
         transforms.Resize((args.img_size, args.img_size)),
         transforms.Grayscale(),
         transforms.ToTensor(),
         transforms.Normalize((0.5,), (0.5,)),
     ])
-    train_dataset = ImageFolder(os.path.join(data_root, 'train'), transform=transform)
-    test_dataset = ImageFolder(os.path.join(data_root, args.test_set), transform=transform)
+    train_dataset = ImageFolder(os.path.join(data_root, 'train'), transform=train_transform)
+    test_dataset = ImageFolder(os.path.join(data_root, args.test_set), transform=test_transform)
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
     test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False)
 
     print(f"Training on {len(train_dataset)} images, testing on {len(test_dataset)} images.")
     # Initialize the model, optimizer, and loss function
-    model = CNN(input_channels=1, img_size=args.img_size, num_classes=num_classes).to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
+    if args.continue_train:
+        model_save_path = os.path.join(args.save_dir, 'Wallpaper', args.test_set,
+                                       improved_dir, 'model', 'model.pt')
+        checkpoint = torch.load(model_save_path)
+
+        if args.improved:
+            model = CNN3(input_channels=1, img_size=args.img_size, num_classes=num_classes)
+        else:
+            model = CNN(input_channels=1, img_size=args.img_size, num_classes=num_classes)
+        model.load_state_dict(checkpoint['model_state_dict'])
+        model.to(device)
+
+        optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
+        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        optimizer.zero_grad()
+
+        epoch = checkpoint['epoch']
+    else:
+        if args.improved:
+            model = CNN2(input_channels=1, img_size=args.img_size, num_classes=num_classes).to(device)
+        else:
+            model = CNN(input_channels=1, img_size=args.img_size, num_classes=num_classes).to(device)
+        optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
     criterion = nn.CrossEntropyLoss()
 
     # Train + test the model
     model, per_epoch_loss, per_epoch_acc, train_preds, train_targets = train(model, train_loader, optimizer, criterion,
-                                                                             args.num_epochs,
+                                                                             epoch, args.num_epochs,
                                                                              args.log_interval, device)
     test_loss, test_acc, test_preds, test_targets = test(model, test_loader, device, criterion)
 
@@ -179,6 +243,17 @@ def wallpaper_main(args):
              test_loss=test_loss, test_acc=test_acc)
 
     # Note: The code does not save the model but you may do so if you choose with the args.save_model flag.
+    if args.save_model:
+        if not os.path.exists(os.path.join(args.save_dir, 'Wallpaper', args.test_set, improved_dir, 'model')):
+            os.makedirs(os.path.join(args.save_dir, 'Wallpaper', args.test_set, improved_dir, 'model'))
+
+        model_save_path = os.path.join(args.save_dir, 'Wallpaper', args.test_set,
+                                       improved_dir, 'model', 'model.pt')
+        torch.save({
+            'epoch': epoch + args.num_epochs,
+            'model_state_dict': model.state_dict(),
+            'optimizer_state_dict': optimizer.state_dict()
+        }, model_save_path)
 
 
 def taiji_main(args):
@@ -189,6 +264,7 @@ def taiji_main(args):
     """
     num_subs = args.num_subs
     num_forms = 46  # Number of taiji forms, hardcoded :p
+    epoch = 0
     sub_train_acc = np.zeros(num_subs)
     sub_class_train = np.zeros((num_subs, num_forms))
     sub_test_acc = np.zeros(num_subs)
@@ -226,7 +302,7 @@ def taiji_main(args):
 
         # Train + test the model
         model, train_losses, per_epoch_train_acc, train_preds, train_targets \
-            = train(model, train_loader, optimizer, criterion, args.num_epochs, args.log_interval, device)
+            = train(model, train_loader, optimizer, criterion, epoch, args.num_epochs, args.log_interval, device)
         test_loss, test_acc, test_pred, test_targets = test(model, test_loader, device, criterion)
 
         # Print accs to three decimal places
