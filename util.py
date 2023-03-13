@@ -520,20 +520,36 @@ def visualize(args, dataset, baseline_model=None, improved_model=None):
             os.mkdir(save_fm_path)
 
         act = feature_map['conv'].squeeze()
-        fig, ax = plt.subplots(2)
-        ax[0].imshow(act[0][0])
+        fig, ax = plt.subplots(4, 5)
         for img_idx in range(act.size(0)):
-            fig, ax = plt.subplots(6, 6)
-            for idx in range(act.size(1)):
-                ax[idx // 6][idx % 6].imshow(act[img_idx][idx])
-                ax[idx // 6][idx % 6].axis('off')
-            # remove unused subplots
-            for idx in range(act.size(1), 36):
-                fig.delaxes(ax[idx // 6][idx % 6])
+            # display channel 1 only
+            idx = 0
+            ax[img_idx // 5][img_idx % 5].imshow(act[img_idx][idx])
+            ax[img_idx // 5][img_idx % 5].axis('off')
+            ax[img_idx // 5][img_idx % 5].title.set_text(idx2dir_dict[img_idx])
+        # remove unused subplots
+        for idx in range(act.size(0), 20):
+            fig.delaxes(ax[idx // 5][idx % 5])
 
-            fig.tight_layout()
-            plt.savefig(os.path.join(save_fm_path, idx2dir_dict[img_idx] + '.png'))
-            plt.close()
+        fig.tight_layout()
+        plt.savefig(os.path.join(save_fm_path, 'conv_layer_act_channel_1.png'))
+        plt.close()
+
+        # act = feature_map['conv'].squeeze()
+        # fig, ax = plt.subplots(2)
+        # ax[0].imshow(act[0][0])
+        # for img_idx in range(act.size(0)):
+        #     fig, ax = plt.subplots(6, 6)
+        #     for idx in range(act.size(1)):
+        #         ax[idx // 6][idx % 6].imshow(act[img_idx][idx])
+        #         ax[idx // 6][idx % 6].axis('off')
+        #     # remove unused subplots
+        #     for idx in range(act.size(1), 36):
+        #         fig.delaxes(ax[idx // 6][idx % 6])
+        #
+        #     fig.tight_layout()
+        #     plt.savefig(os.path.join(save_fm_path, idx2dir_dict[img_idx] + '.png'))
+        #     plt.close()
 
     return
 

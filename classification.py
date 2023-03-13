@@ -164,9 +164,6 @@ def wallpaper_main(args):
         ])
         aug_transform_diff1 = transforms.RandomChoice(
             [transforms.RandomAffine(degrees=(0, 360), translate=(0.5, 0.5), scale=(0.5, 2)),
-             # transforms.RandomAffine(degrees=(0, 360)),
-             # transforms.RandomAffine(degrees=0, translate=(0.5, 0.5)),
-             # transforms.RandomAffine(degrees=0, scale=(0.5, 2)),
              transforms.RandomHorizontalFlip(p=1),
              transforms.RandomVerticalFlip(p=1),
              transforms.RandomResizedCrop(size=(args.img_size, args.img_size))])
@@ -175,9 +172,6 @@ def wallpaper_main(args):
         aug_transform_diff5 = transforms.Compose(
             [
                 transforms.RandomAffine(degrees=(0, 360), translate=(0.5, 0.5), scale=(0.5, 2)),
-                # transforms.RandomAffine(degrees=(0, 360)),
-                # transforms.RandomAffine(degrees=0, translate=(0.5, 0.5)),
-                # transforms.RandomAffine(degrees=0, scale=(0.5, 2)),
                 transforms.RandomHorizontalFlip(p=1),
                 transforms.RandomVerticalFlip(p=1),
                 transforms.RandomResizedCrop(size=(args.img_size, args.img_size))])
