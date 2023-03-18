@@ -138,6 +138,7 @@ def wallpaper_main(args):
 
     # TODO: Augment the training data given the transforms in the assignment description.
     if args.aug_train:
+        # prepare different levels of data augmentation for training
         aux_transform1 = transforms.Compose([
             transforms.RandomAffine(degrees=(0, 360), translate=(0.5, 0.5), scale=(0.5, 2)),
             transforms.RandomHorizontalFlip(p=1),
