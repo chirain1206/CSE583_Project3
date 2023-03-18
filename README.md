@@ -36,6 +36,17 @@ python classification.py --dataset Wallpaper --train --test_set test
 python classification.py --dataset Wallpaper --train --test_set test_challenge
 ```
 
+## Additional Command-line argument 
+After installing the required packages, you can run the code to train each "variant" of the datasets with (assuming your system is compatible with the default arguments):
+```
+--save_model		- Save the model for subsequent evaluation or training if specified
+--comp_subject_numb	- The test subject number for comparison of the confusion matrix
+--aug_train		- Whether or not to use data augmentation for training
+--improved		- Whether or not to use the improved architecture
+--load			- if specified, load the save model from save_model location
+--visualize_fm		- if specified, visualize the feature maps of first convolutional layer (channel 1) of the improved model
+--visualize_tSNE	- if specified, visualize the t-SNE result on the input of the last fully connected layer of the improved model
+```
 
 ## Data
 - data/taiji_data_full.npz (same as P2)
